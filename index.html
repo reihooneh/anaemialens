@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>AnaemiaLens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: screening tool. Photo stage on the left, live reading on the right; stacks to one column on phones. */
+:root{
+  --bg:#F2F4F5; --surface:#FFFFFF; --ink:#15202A; --muted:#5A6774; --line:#D8DEE3;
+  --accent:#A81F37; --accent-ink:#FFFFFF;
+  --ok:#2C7A57; --warn:#A86A12; --bad:#B8401A;
+  --zone-pale:#EBCFCB; --zone-mid:#F1E0BE; --zone-norm:#CFE4D8;
+  --display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0E1317; --surface:#161E25; --ink:#E6EBEE; --muted:#93A0AB; --line:#2A3540;
+  --accent:#E35770; --accent-ink:#1A0B0F;
+  --ok:#52B88C; --warn:#E2AA4C; --bad:#F2804F;
+  --zone-pale:#4A2C2E; --zone-mid:#4A3D22; --zone-norm:#203D31; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0E1317; --surface:#161E25; --ink:#E6EBEE; --muted:#93A0AB; --line:#2A3540;
+  --accent:#E35770; --accent-ink:#1A0B0F;
+  --ok:#52B88C; --warn:#E2AA4C; --bad:#F2804F;
+  --zone-pale:#4A2C2E; --zone-mid:#4A3D22; --zone-norm:#203D31; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;gap:28px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.1}
+h1{font-size:clamp(2rem,5vw,3rem);letter-spacing:-.02em}
+h2{font-size:1.35rem}
+h3{font-size:1.05rem}
+p{margin:0}
+a{color:var(--accent)}
+.lede{color:var(--muted);max-width:62ch;font-size:1.05rem}
+.top{display:grid;gap:10px}
+.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.facts{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:.9rem;color:var(--muted)}
+.facts b{color:var(--ink);font-family:var(--mono);font-weight:500}
+
+.tool{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.tool{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:14px;min-width:0;align-content:start}
+
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.filebtn{font:inherit;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;line-height:1.2}
+button:hover,.filebtn:hover{border-color:var(--muted)}
+button:focus-visible,.filebtn:focus-within,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.filebtn{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.filebtn input{position:absolute;width:1px;height:1px;opacity:0}
+.label{font-family:var(--mono);font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+
+.stage{position:relative;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--line);touch-action:none}
+.stage canvas{display:block;width:100%;height:auto}
+#ov{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+.hint{font-size:.92rem;color:var(--muted)}
+.hint strong{color:var(--ink)}
+
+.verdict{display:grid;gap:6px;padding:14px;border-radius:10px;background:var(--bg);border-left:4px solid var(--muted)}
+.verdict[data-k="pale"]{border-left-color:var(--bad)}
+.verdict[data-k="mid"]{border-left-color:var(--warn)}
+.verdict[data-k="norm"]{border-left-color:var(--ok)}
+.verdict[data-k="retake"]{border-left-color:var(--warn)}
+.verdict h2{font-size:1.6rem}
+
+.gauge{display:grid;gap:6px}
+.track{position:relative;height:30px;border-radius:6px;overflow:visible;display:grid;grid-template-columns:38% 8% 54%}
+.track span{display:block;height:100%}
+.track span:nth-child(1){background:var(--zone-pale);border-radius:6px 0 0 6px}
+.track span:nth-child(2){background:var(--zone-mid)}
+.track span:nth-child(3){background:var(--zone-norm);border-radius:0 6px 6px 0}
+.mk{position:absolute;top:-6px;width:0;height:42px;transition:left .35s ease}
+.mk::before{content:"";position:absolute;left:-2px;top:0;width:4px;height:100%;border-radius:2px}
+.mk.raw::before{background:transparent;border:2px dashed var(--muted);width:0;left:-1px}
+.mk.cor::before{background:var(--ink)}
+.scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.85rem;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:0;border-top:3px solid var(--ink);vertical-align:middle;margin-right:6px}
+.legend i.d{border-top:3px dashed var(--muted)}
+.nums{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:.92rem}
+.nums dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.nums dt{color:var(--muted)}
+.flip{font-size:.92rem;padding:10px 12px;border-radius:8px;background:var(--zone-mid);color:var(--ink)}
+
+.checks{display:grid;gap:8px;list-style:none;margin:0;padding:0}
+.checks li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:.92rem}
+.pill{font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid currentColor;min-width:52px;text-align:center}
+.pill.pass{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.fail{color:var(--bad)} .pill.wait{color:var(--muted)}
+
+select{font:inherit;font-size:.92rem;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.switch{display:flex;gap:10px;align-items:center;font-size:.92rem;cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--accent)}
+
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;counter-reset:s;list-style:none;margin:0;padding:0}
+@media (max-width:860px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.steps{grid-template-columns:1fr}}
+.steps li{counter-increment:s;display:grid;gap:6px;align-content:start;min-width:0}
+.steps li::before{content:"Step " counter(s);font-family:var(--mono);font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.steps p{color:var(--muted);font-size:.93rem}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:700px){.two{grid-template-columns:1fr}}
+.two ul{margin:0;padding-left:18px;color:var(--muted);display:grid;gap:4px;font-size:.95rem}
+footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:14px;display:grid;gap:4px}
+@media (prefers-reduced-motion:reduce){.mk{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Optimise 26 prototype · Screening, not diagnosis</span>
+    <h1>AnaemiaLens</h1>
+    <p class="lede">A needle-free anaemia screen. Photograph the inside of the lower eyelid, and the app checks the photo, corrects for room lighting using the white of the eye, and measures how pale the eyelid is.</p>
+    <div class="facts">
+      <span><b>1.92 billion</b> people with anaemia in 2021</span>
+      <span><b>1 in 4</b> people worldwide</span>
+      <span>Hardest hit: <b>young children</b> and <b>women</b></span>
+    </div>
+  </header>
+
+  <section class="tool" aria-label="Screening tool">
+    <div class="panel">
+      <div class="row">
+        <label class="filebtn">Take or upload a photo<input id="file" type="file" accept="image/*"></label>
+        <button id="sA" type="button" aria-pressed="false">Sample: healthy eyelid</button>
+        <button id="sB" type="button" aria-pressed="true">Sample: pale eyelid</button>
+      </div>
+      <div class="stage">
+        <canvas id="img" width="900" height="600"></canvas>
+        <canvas id="ov" width="900" height="600" aria-label="Photo. Drag to mark the eyelid, tap to mark the white of the eye."></canvas>
+      </div>
+      <div class="row">
+        <span class="label">Marking</span>
+        <button id="mRoi" type="button" aria-pressed="true">1 · Inner eyelid (drag)</button>
+        <button id="mRef" type="button" aria-pressed="false">2 · White of eye (tap)</button>
+      </div>
+      <p class="hint" id="hint"></p>
+      <p class="hint">Samples are computer-drawn eyes, not real patients.</p>
+    </div>
+
+    <div class="panel" aria-live="polite">
+      <div class="verdict" id="verdict" data-k="none">
+        <span class="label">Result</span>
+        <h2 id="vTitle">Mark the eyelid</h2>
+        <p id="vBody">Drag a box over the pink inside of the lower eyelid.</p>
+      </div>
+
+      <div class="gauge">
+        <span class="label">Eyelid redness index</span>
+        <div class="track" id="track"><span></span><span></span><span></span>
+          <div class="mk raw" id="mkRaw" hidden></div>
+          <div class="mk cor" id="mkCor" hidden></div>
+        </div>
+        <div class="scale"><span>0.00 pale</span><span>0.19</span><span>0.23</span><span>0.50 red</span></div>
+        <div class="legend"><span><i></i>Corrected for lighting</span><span><i class="d"></i>Raw photo</span></div>
+      </div>
+
+      <dl class="nums" id="nums"></dl>
+      <p class="flip" id="flip" hidden></p>
+
+      <div>
+        <span class="label">Photo checks</span>
+        <ul class="checks" id="checks"></ul>
+      </div>
+
+      <div style="display:grid;gap:10px">
+        <span class="label">Try real-world conditions</span>
+        <div class="row">
+          <label for="cond" class="hint">Room light</label>
+          <select id="cond">
+            <option value="day">Daylight</option>
+            <option value="warm" selected>Warm yellow bulb</option>
+            <option value="cool">Cool LED</option>
+            <option value="dim">Dim room</option>
+          </select>
+          <label class="switch"><input type="checkbox" id="shake"> Shaky hand</label>
+        </div>
+        <label class="switch"><input type="checkbox" id="corr" checked> Correct colour using the white of the eye</label>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><h3>Capture</h3><p>The user pulls down the lower eyelid and takes a photo with any phone camera.</p></li>
+      <li><h3>Check the photo</h3><p>The app refuses to guess on a dark, blurry or glare-covered photo and asks for a retake instead.</p></li>
+      <li><h3>Correct the light</h3><p>The white of the eye should be neutral. Any tint it shows comes from the room light, so the app removes that tint from the eyelid too.</p></li>
+      <li><h3>Measure pallor</h3><p>It measures how red the eyelid tissue is. Low redness means pallor, a classic clinical sign of anaemia, and the app advises a blood test.</p></li>
+    </ol>
+  </section>
+
+  <section class="two">
+    <div class="panel">
+      <h3>Working in this demo</h3>
+      <ul>
+        <li>Photo upload and marking</li>
+        <li>Brightness, sharpness and glare checks</li>
+        <li>Lighting correction from the white of the eye</li>
+        <li>Redness measurement, raw and corrected</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Comes next in the full project</h3>
+      <ul>
+        <li>Thresholds here are hand-set for the demo and are not medically calibrated</li>
+        <li>Replace them with a model trained on the CP-AnemiC dataset (710 children, lab-measured haemoglobin)</li>
+        <li>Test it on adults from Italy and India (Eyes-defy-anemia) to see if it generalises</li>
+        <li>Automatic eyelid detection, so no manual marking</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <span>Prototype by Reihaneh Rahmati, Bachelor of Computer Science, Western Sydney University. Not a medical device. Photos stay on this device and are never uploaded.</span>
+    <span>Prevalence figure: GBD 2021 Anaemia Collaborators, <a href="https://healthdata.org/node/10712" target="_blank" rel="noopener">The Lancet Haematology, 2023</a>.</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const img=$('img'), ov=$('ov'), ictx=img.getContext('2d',{willReadFrequently:true}), octx=ov.getContext('2d');
+const CASTS={day:[1,1,1],warm:[1.2,0.9,0.68],cool:[0.86,0.98,1.15],dim:[0.35,0.35,0.35]};
+const T_PALE=0.19, T_NORM=0.23;
+const S={base:null,proc:null,w:900,h:600,roi:null,ref:null,mode:'roi',drag:null};
+
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function makeSample(pale){
+  const c=document.createElement('canvas');c.width=900;c.height=600;const x=c.getContext('2d');const r=rng(pale?7:3);
+  const g=x.createRadialGradient(450,300,80,450,300,600);g.addColorStop(0,'rgb(204,158,128)');g.addColorStop(1,'rgb(170,124,96)');
+  x.fillStyle=g;x.fillRect(0,0,900,600);
+  // conjunctiva (inner lower eyelid)
+  const conj=pale?[220,172,170]:[198,92,98];
+  const cp=new Path2D();cp.moveTo(190,250);cp.quadraticCurveTo(450,540,710,250);cp.closePath();
+  x.fillStyle=`rgb(${conj})`;x.fill(cp);
+  x.save();x.clip(cp);
+  const n=pale?6:16;
+  for(let i=0;i<n;i++){const sx=230+r()*440,sy=330+r()*50;x.beginPath();x.moveTo(sx,sy);
+    x.bezierCurveTo(sx+r()*60-30,sy+r()*30,sx+r()*80-40,sy+r()*30-10,sx+r()*120-60,sy+r()*40-10);
+    x.lineWidth=1+r()*1.6;x.strokeStyle=`rgba(${Math.round(conj[0]*.78)},${Math.round(conj[1]*.55)},${Math.round(conj[2]*.6)},.5)`;x.stroke();}
+  x.restore();
+  x.strokeStyle='rgba(120,70,60,.55)';x.lineWidth=5;x.beginPath();x.moveTo(190,252);x.quadraticCurveTo(450,542,710,252);x.stroke();
+  // eye
+  const ep=new Path2D();ep.moveTo(190,250);ep.quadraticCurveTo(450,90,710,250);ep.quadraticCurveTo(450,410,190,250);
+  x.fillStyle='rgb(215,213,210)';x.fill(ep);
+  x.save();x.clip(ep);
+  const sh=x.createRadialGradient(450,250,120,450,250,300);sh.addColorStop(0,'rgba(0,0,0,0)');sh.addColorStop(1,'rgba(60,50,50,.18)');x.fillStyle=sh;x.fillRect(150,80,600,340);
+  x.fillStyle='rgb(206,140,140)';x.beginPath();x.ellipse(205,252,18,12,0,0,7);x.fill();
+  const ig=x.createRadialGradient(450,245,10,450,245,85);ig.addColorStop(0,'rgb(70,45,25)');ig.addColorStop(.7,'rgb(110,75,40)');ig.addColorStop(1,'rgb(60,40,22)');
+  x.fillStyle=ig;x.beginPath();x.arc(450,245,85,0,7);x.fill();
+  x.fillStyle='rgb(14,10,8)';x.beginPath();x.arc(450,245,34,0,7);x.fill();
+  x.fillStyle='rgba(255,255,255,.9)';x.beginPath();x.arc(472,222,9,0,7);x.fill();
+  x.restore();
+  x.strokeStyle='rgb(40,26,20)';x.lineWidth=6;x.beginPath();x.moveTo(190,250);x.quadraticCurveTo(450,90,710,250);x.stroke();
+  x.lineWidth=2.2;for(let i=0;i<34;i++){const t=.06+i/38,px=(1-t)*(1-t)*190+2*t*(1-t)*450+t*t*710,py=(1-t)*(1-t)*250+2*t*(1-t)*90+t*t*250;
+    x.beginPath();x.moveTo(px,py);x.quadraticCurveTo(px+(t-.5)*30,py-22,px+(t-.5)*60,py-34-r()*8);x.stroke();}
+  x.strokeStyle='rgba(110,70,50,.35)';x.lineWidth=3;x.beginPath();x.moveTo(170,215);x.quadraticCurveTo(450,30,730,215);x.stroke();
+  const d=x.getImageData(0,0,900,600),p=d.data;
+  for(let i=0;i<p.length;i+=4){const k=(r()-.5)*14;p[i]+=k;p[i+1]+=k;p[i+2]+=k;}
+  return d;
+}
+
+function boxBlur(d,w,h,rad){
+  const p=d.data,tmp=new Float32Array(p.length),win=rad*2+1;
+  for(let y=0;y<h;y++)for(let c=0;c<3;c++){let s=0;for(let k=-rad;k<=rad;k++){const xx=Math.min(w-1,Math.max(0,k));s+=p[(y*w+xx)*4+c]}
+    for(let x=0;x<w;x++){tmp[(y*w+x)*4+c]=s/win;const a=Math.min(w-1,x+rad+1),b=Math.max(0,x-rad);s+=p[(y*w+a)*4+c]-p[(y*w+b)*4+c];}}
+  for(let x=0;x<w;x++)for(let c=0;c<3;c++){let s=0;for(let k=-rad;k<=rad;k++){const yy=Math.min(h-1,Math.max(0,k));s+=tmp[(yy*w+x)*4+c]}
+    for(let y=0;y<h;y++){p[(y*w+x)*4+c]=s/win;const a=Math.min(h-1,y+rad+1),b=Math.max(0,y-rad);s+=tmp[(a*w+x)*4+c]-tmp[(b*w+x)*4+c];}}
+}
+
+function process(){
+  if(!S.base)return;
+  const d=new ImageData(new Uint8ClampedArray(S.base.data),S.w,S.h),p=d.data,m=CASTS[$('cond').value];
+  for(let i=0;i<p.length;i+=4){p[i]=p[i]*m[0];p[i+1]=p[i+1]*m[1];p[i+2]=p[i+2]*m[2];}
+  if($('shake').checked)boxBlur(d,S.w,S.h,Math.max(4,Math.round(S.w/90)));
+  ictx.putImageData(d,0,0);S.proc=d;S.sharp=globalSharp(d);analyse();drawOv();
+}
+
+function globalSharp(d){
+  // Sharpness of the whole photo (edges such as lashes and the lid margin), measured at a fixed 480px width so any phone resolution compares fairly.
+  const p=d.data,step=Math.max(1,S.w/480),W=Math.floor(S.w/step),H=Math.floor(S.h/step),L=new Float32Array(W*H);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(Math.floor(y*step)*S.w+Math.floor(x*step))*4;L[y*W+x]=.299*p[i]+.587*p[i+1]+.114*p[i+2];}
+  let s=0,s2=0,m=0;const x0=Math.floor(W*.1),x1=Math.ceil(W*.9),y0=Math.floor(H*.1),y1=Math.ceil(H*.9);
+  for(let y=Math.max(1,y0);y<Math.min(H-1,y1);y++)for(let x=Math.max(1,x0);x<Math.min(W-1,x1);x++){const k=y*W+x,v=4*L[k]-L[k-1]-L[k+1]-L[k-W]-L[k+W];s+=v;s2+=v*v;m++;}
+  return m?s2/m-(s/m)**2:0;
+}
+function regionStats(r){
+  const p=S.proc.data,w=S.w;let R=0,G=0,B=0,L=0,n=0,gl=0;
+  const x0=Math.max(0,Math.round(r.x)),y0=Math.max(0,Math.round(r.y)),x1=Math.min(S.w,Math.round(r.x+r.w)),y1=Math.min(S.h,Math.round(r.y+r.h));
+  const lum=new Float32Array((x1-x0)*(y1-y0));
+  for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*w+x)*4,a=p[i],b=p[i+1],c=p[i+2];R+=a;G+=b;B+=c;const l=.299*a+.587*b+.114*c;lum[(y-y0)*(x1-x0)+(x-x0)]=l;L+=l;n++;if(a>245&&b>245&&c>245)gl++;}
+  const W=x1-x0,H=y1-y0;let s=0,s2=0,m=0;
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const k=y*W+x,v=4*lum[k]-lum[k-1]-lum[k+1]-lum[k-W]-lum[k+W];s+=v;s2+=v*v;m++;}
+  const lap=m?s2/m-(s/m)**2:0;
+  return{R:R/n,G:G/n,B:B/n,L:L/n,glare:gl/n,lap,n};
+}
+function refStats(){
+  const rad=Math.max(6,S.w*.012);return regionStats({x:S.ref.x-rad,y:S.ref.y-rad,w:rad*2,h:rad*2});
+}
+const ri=(R,G)=>(R-G)/(R+G);
+function cat(v){return v<T_PALE?'pale':v<T_NORM?'mid':'norm'}
+const CATNAME={pale:'Looks pale',mid:'Borderline',norm:'No obvious pallor'};
+
+function setVerdict(k,t,b){$('verdict').dataset.k=k;$('vTitle').textContent=t;$('vBody').textContent=b;}
+function check(state,text){return `<li><span class="pill ${state}">${{pass:'OK',warn:'Check',fail:'Retake',wait:'—'}[state]}</span><span>${text}</span></li>`}
+
+function analyse(){
+  const ch=[], mkR=$('mkRaw'), mkC=$('mkCor'), nums=$('nums'), flip=$('flip');
+  flip.hidden=true;
+  if(!S.roi){setVerdict('none','Step 1 of 2: mark the eyelid','Drag a box over the pink inside of the lower eyelid, or tap the middle of it.');mkR.hidden=mkC.hidden=true;nums.innerHTML='';
+    $('checks').innerHTML=check('wait','Waiting for the eyelid to be marked');hint();return;}
+  const st=regionStats(S.roi);
+  let bright='pass',bt=`Lighting is fine (brightness ${st.L.toFixed(0)} of 255)`;
+  if(st.L<35){bright='fail';bt=`Too dark to read (brightness ${st.L.toFixed(0)} of 255). Move to better light.`}
+  else if(st.L<70){bright='warn';bt=`A bit dark (brightness ${st.L.toFixed(0)} of 255). Daylight gives a more reliable reading.`}
+  else if(st.L>245){bright='fail';bt='Overexposed. Move out of direct light or turn off the flash.'}
+  else if(st.L>230){bright='warn';bt='Very bright. Avoid direct sun or flash if you can.'}
+  const sh=S.sharp, sharp=sh<6?"fail":sh<25?"warn":'pass',
+    stt=sharp==='fail'?`Too blurry to read (sharpness ${sh.toFixed(0)}). Hold the phone steady and tap to focus.`:sharp==='warn'?`Slightly soft (sharpness ${sh.toFixed(0)}). Usable, but a sharper photo is better.`:`Sharp enough (sharpness ${sh.toFixed(0)})`;
+  const glare=st.glare>0.08?'warn':'pass', gt=glare==='warn'?`${(st.glare*100).toFixed(0)}% of the eyelid is glare. Tilt the phone.`:'No glare on the eyelid';
+  ch.push(check(bright,bt),check(sharp,stt),check(glare,gt));
+  const raw=ri(st.R,st.G);let cor=null,refNote;
+  if(S.ref){const rs=refStats();const avg=(rs.R+rs.G+rs.B)/3;const sat=(Math.max(rs.R,rs.G,rs.B)-Math.min(rs.R,rs.G,rs.B))/Math.max(1,Math.max(rs.R,rs.G,rs.B));
+    if(rs.L<60){refNote=check('warn','The marked eye white is too dark to use as a reference')}
+    else{cor=ri(st.R*avg/rs.R,st.G*avg/rs.G);refNote=check(sat>0.45?'warn':'pass',sat>0.45?'The marked spot looks strongly tinted. Make sure it is on the white of the eye.':'White of the eye found. Lighting correction available.')}
+  } else refNote=check('warn','Tap the white of the eye so the app can correct for room lighting');
+  ch.push(refNote);$('checks').innerHTML=ch.join('');
+  const useCor=$('corr').checked&&cor!==null, final=useCor?cor:raw;
+  const pos=v=>Math.min(100,Math.max(0,v/0.5*100))+'%';
+  mkR.hidden=false;mkR.style.left=pos(raw);
+  mkC.hidden=cor===null;if(cor!==null)mkC.style.left=pos(cor);
+  nums.innerHTML=`<dt>Raw photo</dt><dd>${raw.toFixed(3)} · ${CATNAME[cat(raw)]}</dd>`+
+    (cor!==null?`<dt>Corrected for lighting</dt><dd>${cor.toFixed(3)} · ${CATNAME[cat(cor)]}</dd>`:'')+
+    `<dt>Eyelid colour (R, G, B)</dt><dd>${st.R.toFixed(0)}, ${st.G.toFixed(0)}, ${st.B.toFixed(0)}</dd>`;
+  if(cor!==null&&cat(raw)!==cat(cor)){flip.hidden=false;
+    flip.textContent=`The room light changed the answer. The raw photo reads "${CATNAME[cat(raw)]}", but after correcting with the white of the eye it reads "${CATNAME[cat(cor)]}".`+(useCor?'':' Turn on colour correction to use the corrected reading.');}
+  if(bright==='fail'||sharp==='fail'){setVerdict('retake','Retake the photo','The app does not give a result from a photo it cannot read reliably. Fix the checks marked Retake.');hint();return;}
+  const k=cat(final);
+  const body={pale:'The eyelid is paler than expected. Get a haemoglobin blood test at a clinic.',
+    mid:'Hard to call. Retake in daylight, or get a blood test to be sure.',
+    norm:'The eyelid colour looks normal. A screen like this cannot rule anaemia out, so see a doctor if you have symptoms.'}[k];
+  setVerdict(k,CATNAME[k],body+(useCor?'':' (Reading uses the raw photo.)'));
+  hint();
+}
+
+function hint(){
+  $('hint').innerHTML=!S.base?'':S.mode==='roi'?'<strong>Drag</strong> a box over the pink inside of the lower eyelid, or <strong>tap</strong> its middle.':'Step 2: <strong>tap</strong> the white of the eye, away from the iris and any shine.';
+  $('mRoi').setAttribute('aria-pressed',S.mode==='roi');$('mRef').setAttribute('aria-pressed',S.mode==='ref');
+}
+
+function drawOv(){
+  octx.clearRect(0,0,ov.width,ov.height);const lw=Math.max(2,S.w/300),cs=getComputedStyle(document.documentElement);
+  const fs=Math.max(12,S.w/50);octx.font=`600 ${fs}px "JetBrains Mono", monospace`;
+  const r=S.drag||S.roi;
+  if(r){octx.setLineDash([lw*4,lw*3]);octx.lineWidth=lw;octx.strokeStyle='#fff';octx.strokeRect(r.x,r.y,r.w,r.h);
+    octx.setLineDash([]);octx.strokeStyle='rgba(0,0,0,.6)';octx.lineWidth=lw/2;octx.strokeRect(r.x-lw,r.y-lw,r.w+2*lw,r.h+2*lw);
+    lbl('EYELID',r.x,r.y-fs*0.5,fs);}
+  if(S.ref){const rad=Math.max(6,S.w*.012);octx.lineWidth=lw;octx.strokeStyle='#fff';octx.beginPath();octx.arc(S.ref.x,S.ref.y,rad,0,7);octx.stroke();
+    octx.strokeStyle='rgba(0,0,0,.7)';octx.beginPath();octx.arc(S.ref.x,S.ref.y,rad+lw,0,7);octx.stroke();
+    lbl('EYE WHITE',S.ref.x-rad,S.ref.y-rad-fs*0.5,fs);}
+}
+function lbl(t,x,y,fs){const w=octx.measureText(t).width+fs*.8;x=Math.max(0,Math.min(S.w-w,x));y=Math.max(fs*1.2,y);
+  octx.fillStyle='rgba(15,20,24,.82)';octx.fillRect(x,y-fs*1.1,w,fs*1.45);octx.fillStyle='#fff';octx.fillText(t,x+fs*.4,y);}
+
+function setSize(w,h){S.w=w;S.h=h;img.width=ov.width=w;img.height=ov.height=h;}
+function loadSample(pale){setSize(900,600);S.base=makeSample(pale);
+  S.roi={x:380,y:346,w:140,h:30};S.ref={x:285,y:252};S.mode='roi';
+  $('sA').setAttribute('aria-pressed',!pale);$('sB').setAttribute('aria-pressed',pale);process();}
+
+function pt(e){const b=ov.getBoundingClientRect();return{x:(e.clientX-b.left)/b.width*S.w,y:(e.clientY-b.top)/b.height*S.h}}
+ov.addEventListener('pointerdown',e=>{if(!S.base)return;const p=pt(e);
+  if(S.mode==='ref'){S.ref=p;analyse();drawOv();return;}
+  ov.setPointerCapture(e.pointerId);S.drag={x:p.x,y:p.y,w:0,h:0,ox:p.x,oy:p.y};});
+ov.addEventListener('pointermove',e=>{if(!S.drag)return;const p=pt(e),d=S.drag;
+  d.x=Math.min(d.ox,p.x);d.y=Math.min(d.oy,p.y);d.w=Math.abs(p.x-d.ox);d.h=Math.abs(p.y-d.oy);drawOv();});
+ov.addEventListener('pointerup',()=>{if(!S.drag)return;const d=S.drag;S.drag=null;
+  if(d.w>8&&d.h>6){S.roi={x:d.x,y:d.y,w:d.w,h:d.h};}
+  else{const bw=S.w*.16,bh=Math.max(S.h*.05,S.w*.035);S.roi={x:Math.max(0,Math.min(S.w-bw,d.ox-bw/2)),y:Math.max(0,Math.min(S.h-bh,d.oy-bh/2)),w:bw,h:bh};}
+  if(!S.ref)S.mode='ref';
+  analyse();drawOv();});
+
+$('file').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
+  const url=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>{const sc=Math.min(1,1000/Math.max(im.width,im.height));const w=Math.round(im.width*sc),h=Math.round(im.height*sc);
+    setSize(w,h);ictx.drawImage(im,0,0,w,h);S.base=ictx.getImageData(0,0,w,h);S.roi=null;S.ref=null;S.mode='roi';
+    $('cond').value='day';$('shake').checked=false;$('sA').setAttribute('aria-pressed',false);$('sB').setAttribute('aria-pressed',false);
+    URL.revokeObjectURL(url);process();};
+  im.onerror=()=>{URL.revokeObjectURL(url);const heic=/hei[cf]/i.test(f.type+f.name);
+    setVerdict('retake','Could not open that photo',heic?'This browser cannot read iPhone HEIC photos. Take the photo from this page instead, or set the iPhone camera format to Most Compatible.':'Choose a JPEG or PNG photo.');};
+  im.src=url;});
+$('sA').onclick=()=>loadSample(false);
+$('sB').onclick=()=>loadSample(true);
+$('mRoi').onclick=()=>{S.mode='roi';hint();};
+$('mRef').onclick=()=>{S.mode='ref';hint();};
+$('cond').onchange=process;$('shake').onchange=process;$('corr').onchange=analyse;
+
+loadSample(true);
+})();
+</script>
+</body>
+</html>
